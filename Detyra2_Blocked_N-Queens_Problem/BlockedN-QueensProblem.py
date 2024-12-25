@@ -85,6 +85,19 @@ def combined_heuristic(state, N, blocked_cells):
     return queens_left + (N - free_cells) + penalty
 
 
+def admissible_combined_heuristic(state, N, blocked_cells):
+    """
+    Heuristikë e kombinuar dhe admissible bazuar në heuristikat ekzistuese.
+    """
+    h1 = heuristic_1(state, N, blocked_cells)
+    h2 = heuristic_2(state, N, blocked_cells)
+    h3 = heuristic_3(state, N, blocked_cells)
+    h4 = heuristic_4(state, N, blocked_cells)
+    h5 = combined_heuristic(state, N, blocked_cells)
+
+    # Kthimi i minimumit të heuristikave për të ruajtur admissibility
+    return min(h1, h2, h3, h4, h5)
+
 
 def visualize_board(N, blocked_cells, solution):
     """ Vizualizon tabelen si matrice """
@@ -144,6 +157,11 @@ visualize_board(N, blocked_cells, solution)
 # Zgjidh problemin me heuristikën e kombinuar
 solution = a_star_n_queens(N, blocked_cells, combined_heuristic)
 print("Zgjidhja me heuristikën e kombinuar:", solution)
+visualize_board(N, blocked_cells, solution)
+
+# Zgjidh problemin me heuristikën e kombinuar admissible
+solution = a_star_n_queens(N, blocked_cells, admissible_combined_heuristic)
+print("Zgjidhja me heuristikën admissible e kombinuar:", solution)
 visualize_board(N, blocked_cells, solution)
 
 

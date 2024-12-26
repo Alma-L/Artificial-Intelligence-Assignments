@@ -3,14 +3,14 @@ class GameState():
 
     def __init__(self):
         self.board = [
-            ["bR", "bN", "bB", "bQ", "bK", "bB", "bN", "bR"],
-            ["bp", "bp", "bp", "bp", "bp", "bp", "bp", "bp"],
+            ["bR", "--", "bB", "bQ", "bK", "--", "bN", "bR"],
+            ["bp", "bp", "bp", "--", "--", "bp", "bp", "bp"],
             ["--", "--", "--", "--", "--", "--", "--", "--"],
-            ["--", "--", "--", "--", "--", "--", "--", "--"],
-            ["--", "--", "--", "--", "--", "--", "--", "--"],
-            ["--", "--", "--", "--", "--", "--", "--", "--"],
-            ["wp", "wp", "wp", "wp", "wp", "wp", "wp", "wp"],
-            ["wR", "wN", "wB", "wQ", "wK", "wB", "wN", "wR"],
+            ["--", "--", "bN", "--", "--", "--", "--", "--"],
+            ["--", "--", "--", "wp", "--", "--", "--", "--"],
+            ["--", "--", "wN", "--", "--", "--", "--", "--"],
+            ["wp", "wp", "wp", "--", "--", "wp", "wp", "wp"],
+            ["wR", "--", "wB", "wQ", "wK", "--", "wN", "wR"],
         ]
         self.whiteToMove = True
         self.moveLog = []
@@ -21,6 +21,7 @@ class GameState():
         """Evaluates the game state based on material and mobility."""
         materialScore = 0
         mobilityScore = 0
+        kingSafetyScore = 0
         moves = self.getAllPossibleMoves()
         for row in self.board:
             for square in row:
@@ -31,8 +32,38 @@ class GameState():
                         materialScore += pieceScore
                     else:
                         materialScore -= pieceScore
+
+        # Additional bonus for mobility
         mobilityScore = len(moves) if self.whiteToMove else -len(moves)
-        return materialScore + 0.1 * mobilityScore
+
+        # Penalize if king is in unsafe position
+        kingSafetyScore = self.evaluateKingSafety()
+
+        return materialScore + 0.1 * mobilityScore + kingSafetyScore
+
+    def evaluateKingSafety(self):
+        """Evaluates king safety based on surrounding squares."""
+        safetyScore = 0
+        kingPosition = self.findKing('w' if self.whiteToMove else 'b')
+        if kingPosition:
+            row, col = kingPosition
+            directions = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
+            for d in directions:
+                r, c = row + d[0], col + d[1]
+                if 0 <= r < 8 and 0 <= c < 8:
+                    piece = self.board[r][c]
+                    if piece == "--":
+                        safetyScore -= 0.05  # Penalize open squares near the king
+                    elif piece[0] == ('w' if self.whiteToMove else 'b'):
+                        safetyScore += 0.1  # Bonus for protected squares
+        return safetyScore
+
+    def findKing(self, color):
+        for r in range(len(self.board)):
+            for c in range(len(self.board[r])):
+                if self.board[r][c] == f"{color}K":
+                    return (r, c)
+        return None
 
     def printBoard(self):
         for row in self.board:
@@ -60,7 +91,6 @@ class GameState():
                 maxEval = max(maxEval, evaluation)
                 alpha = max(alpha, evaluation)
                 if beta <= alpha:
-                    print(f"Pruning: Beta ({beta}) <= Alpha ({alpha}) at depth {depth}")
                     break
             return maxEval
         else:
@@ -72,7 +102,6 @@ class GameState():
                 minEval = min(minEval, evaluation)
                 beta = min(beta, evaluation)
                 if beta <= alpha:
-                    print(f"Pruning: Beta ({beta}) <= Alpha ({alpha}) at depth {depth}")
                     break
             return minEval
 
@@ -89,20 +118,13 @@ class GameState():
             return None
 
         for move in validMoves:
-            print(f"Evaluating move: {move.getChessNotation()}")
             self.makeMove(move)
-            self.printBoard()
             evaluation = self.minimax(depth - 1, alpha, beta, False)
             self.undoMove()
-            print(f"Move: {move.getChessNotation()}, Evaluation = {evaluation}")
             if evaluation > maxEval:
                 maxEval = evaluation
                 bestMove = move
 
-        if bestMove is not None:
-            print(f"Best Move: {bestMove.getChessNotation()}, Evaluation = {maxEval}")
-        else:
-            print("No move selected as best.")
         return bestMove
 
     def makeMove(self, move):
@@ -122,7 +144,9 @@ class GameState():
 
     def getValidMoves(self):
         """Generates valid moves."""
-        return self.getAllPossibleMoves()
+        moves = self.getAllPossibleMoves()
+        moves.sort(key=lambda move: self.pieceScores.get(move.pieceCaptured[1], 0), reverse=True)
+        return moves
 
     def getAllPossibleMoves(self):
         """Generates all possible moves without checks."""
@@ -130,7 +154,8 @@ class GameState():
         for r in range(len(self.board)):
             for c in range(len(self.board[r])):
                 piece = self.board[r][c]
-                if piece != "--" and ((piece[0] == 'w' and self.whiteToMove) or (piece[0] == 'b' and not self.whiteToMove)):
+                if piece != "--" and (
+                        (piece[0] == 'w' and self.whiteToMove) or (piece[0] == 'b' and not self.whiteToMove)):
                     self.addPieceMoves(r, c, moves)
         return moves
 
@@ -222,6 +247,7 @@ class GameState():
                 if endPiece == "--" or endPiece[0] != allyColor:
                     moves.append(Move((r, c), (endRow, endCol), self.board))
 
+
 class Move():
     ranksToRows = {"1": 7, "2": 6, "3": 5, "4": 4, "5": 3, "6": 2, "7": 1, "8": 0}
     rowsToRanks = {v: k for k, v in ranksToRows.items()}
@@ -245,8 +271,33 @@ class Move():
 # Main driver
 if __name__ == "__main__":
     gs = GameState()
-    bestMove = gs.getBestMove(depth=3)
-    if bestMove:
-        print(f"Best Move: {bestMove.getChessNotation()}")
+    print("Initial Board:")
+    gs.printBoard()
+
+    validMoves = gs.getValidMoves()
+    if validMoves:
+        moveEvaluations = []
+        for move in validMoves:
+            gs.makeMove(move)
+            evaluation = gs.minimax(depth=2, alpha=float('-inf'), beta=float('inf'), maximizingPlayer=False)
+            moveEvaluations.append((move, evaluation))
+            gs.undoMove()
+            print(f"Move {move.getChessNotation()}: Evaluation = {evaluation:.2f}")
+
+        # Sort moves by evaluation to find the two best moves
+        moveEvaluations.sort(key=lambda x: x[1], reverse=True)
+        bestMoves = moveEvaluations[:2]
+
+        print("\nAlpha-Beta Tracing and Evaluations for Best Moves:")
+        for idx, (move, eval) in enumerate(bestMoves):
+            print(f"\nBest Move {idx + 1}: {move.getChessNotation()} (Evaluation = {eval:.2f})")
+            gs.makeMove(move)
+            print("Board after move:")
+            gs.printBoard()
+            print(f"Recalculating minimax for move {move.getChessNotation()}...")
+            evaluation = gs.minimax(depth=2, alpha=float('-inf'), beta=float('inf'), maximizingPlayer=False)
+            print(f"Final Evaluation: {evaluation:.2f}")
+            gs.undoMove()
     else:
-        print("No moves available. Game over or invalid state.")
+        print("No valid moves available. Game over or invalid state.")
+

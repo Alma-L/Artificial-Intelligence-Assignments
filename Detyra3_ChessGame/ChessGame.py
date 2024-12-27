@@ -1,5 +1,12 @@
 class GameState():
-    pieceScores = {'p': 1, 'N': 3, 'B': 3, 'R': 5, 'Q': 9, 'K': 100}
+    pieceScores = {
+        'p': 1,  # Pawn
+        'N': 3.3,  # Knight (slightly more for early-game activity)
+        'B': 3.5,  # Bishop (often considered slightly better than knight due to long-range control)
+        'R': 5,  # Rook
+        'Q': 9,  # Queen
+        'K': 1000  # King (assign an arbitrarily high value to ensure safety)
+    }
 
     def __init__(self):
         self.board = [
@@ -279,25 +286,23 @@ if __name__ == "__main__":
         moveEvaluations = []
         for move in validMoves:
             gs.makeMove(move)
-            evaluation = gs.minimax(depth=2, alpha=float('-inf'), beta=float('inf'), maximizingPlayer=False)
+            evaluation = gs.minimax(depth=3, alpha=float('-inf'), beta=float('inf'), maximizingPlayer=False)
             moveEvaluations.append((move, evaluation))
             gs.undoMove()
             print(f"Move {move.getChessNotation()}: Evaluation = {evaluation:.2f}")
 
-        # Sort moves by evaluation to find the two best moves
+        # Sort moves by evaluation to find the top 3 moves
         moveEvaluations.sort(key=lambda x: x[1], reverse=True)
-        bestMoves = moveEvaluations[:2]
+        bestMoves = moveEvaluations[:3]
 
-        print("\nAlpha-Beta Tracing and Evaluations for Best Moves:")
+        print("\nTop 3 Moves and Evaluations:")
         for idx, (move, eval) in enumerate(bestMoves):
-            print(f"\nBest Move {idx + 1}: {move.getChessNotation()} (Evaluation = {eval:.2f})")
+            print(f"Move {idx + 1}: {move.getChessNotation()} (Evaluation = {eval:.2f})")
             gs.makeMove(move)
             print("Board after move:")
             gs.printBoard()
-            print(f"Recalculating minimax for move {move.getChessNotation()}...")
-            evaluation = gs.minimax(depth=2, alpha=float('-inf'), beta=float('inf'), maximizingPlayer=False)
-            print(f"Final Evaluation: {evaluation:.2f}")
             gs.undoMove()
     else:
         print("No valid moves available. Game over or invalid state.")
+
 
